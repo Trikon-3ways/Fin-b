@@ -7,8 +7,6 @@ import cors from 'cors';
 
 const app = express();
 app.use(cors());
-const port = process.env.PORT || 3001;
-
 app.use(express.json());
 
 // Health check endpoint
@@ -29,28 +27,37 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-const MONGOURI = process.env.MONGOURI || 'mongodb://localhost:27017/personal-expense-tracker';
+// MongoDB connection - only connect when needed
+let isConnected = false;
 
-// Connect to MongoDB with better error handling
 const connectDB = async () => {
+  if (isConnected) return;
+  
   try {
+    const MONGOURI = process.env.MONGOURI || 'mongodb://localhost:27017/personal-expense-tracker';
     await mongoose.connect(MONGOURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
+    isConnected = true;
     console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    // Don't exit the process in serverless environment
   }
 };
 
-// Connect to database
-connectDB();
-
-// Start the server
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// Connect to database on first request
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
 });
+
+// Only start server for local development
+if (process.env.NODE_ENV !== 'production') {
+  const port = process.env.PORT || 3001;
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+}
 
 export default app;
