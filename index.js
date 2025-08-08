@@ -28,7 +28,7 @@ app.use((err, req, res, next) => {
 });
 
 // MongoDB connection string
-const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlKKJez@personalexpensetracker.kpm5gmx.mongodb.net/personalexpensetracker';
+const MONGOURI = process.env.MONGOURI ;
 
 // Connect to MongoDB immediately
 console.log('Connecting to MongoDB...');
