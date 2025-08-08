@@ -4,7 +4,19 @@ import financialRecordRouter from "../routes/financial-records.js";
 import cors from 'cors';
 
 const app = express();
-app.use(cors());
+
+// Configure CORS to allow requests from your frontend
+app.use(cors({
+  origin: [
+    'https://finance-tracker-frontend-nu-eight.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // Health check endpoint
