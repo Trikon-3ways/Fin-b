@@ -27,29 +27,23 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// MongoDB connection - only connect when needed
-let isConnected = false;
+// MongoDB connection string
+const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlKKJez@personalexpensetracker.kpm5gmx.mongodb.net/personalexpensetracker';
 
-const connectDB = async () => {
-  if (isConnected) return;
-  
-  try {
-    const MONGOURI = process.env.MONGOURI || 'mongodb://localhost:27017/personal-expense-tracker';
-    await mongoose.connect(MONGOURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    isConnected = true;
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-  }
-};
-
-// Connect to database on first request
-app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+// Connect to MongoDB immediately
+console.log('Connecting to MongoDB...');
+mongoose.connect(MONGOURI, {
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  bufferCommands: false,
+  maxPoolSize: 10,
+  minPoolSize: 1,
+})
+.then(() => {
+  console.log('✅ MongoDB connected successfully!');
+})
+.catch((error) => {
+  console.error('❌ MongoDB connection failed:', error.message);
 });
 
 // Only start server for local development
