@@ -20,6 +20,32 @@ app.get('/', (req, res) => {
   res.json({ message: 'Personal Expense Tracker API is running!' });
 });
 
+// MongoDB connection test endpoint
+app.get('/test-db', async (req, res) => {
+  try {
+    console.log('🧪 Testing MongoDB connection...');
+    console.log('Connection state:', mongoose.connection.readyState);
+    console.log('Is connected:', isConnected);
+    
+    await connectDB();
+    
+    console.log('✅ Connection test successful');
+    res.json({ 
+      message: 'MongoDB connection test successful',
+      connectionState: mongoose.connection.readyState,
+      isConnected: isConnected
+    });
+  } catch (error) {
+    console.error('❌ Connection test failed:', error);
+    res.status(500).json({ 
+      message: 'MongoDB connection test failed',
+      error: error.message,
+      connectionState: mongoose.connection.readyState,
+      isConnected: isConnected
+    });
+  }
+});
+
 app.use("/financial-records", financialRecordRouter);
 
 // Handle 404 errors
@@ -40,9 +66,9 @@ const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlK
 let isConnected = false;
 let connectionPromise = null;
 let retryCount = 0;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3; // Reduced retries
 
-// Connect to MongoDB function with ultra-aggressive timeouts
+// Connect to MongoDB function with serverless-optimized approach
 const connectDB = async () => {
   // Check if already connected and healthy
   if (isConnected && mongoose.connection.readyState === 1) {
@@ -65,29 +91,33 @@ const connectDB = async () => {
     if (mongoose.connection.readyState !== 0) {
       console.log('🔄 Force disconnecting existing connection...');
       await mongoose.disconnect();
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait for cleanup
+      await new Promise(resolve => setTimeout(resolve, 100)); // Faster cleanup
     }
     
     connectionPromise = mongoose.connect(MONGOURI, {
-      serverSelectionTimeoutMS: 1000, // Even more aggressive
-      socketTimeoutMS: 2000, // Even more aggressive
+      // Ultra-fast timeouts for serverless
+      serverSelectionTimeoutMS: 500, // Very aggressive
+      socketTimeoutMS: 1000, // Very aggressive
       bufferCommands: false, // Critical for serverless
       maxPoolSize: 1, // Minimal pool
       minPoolSize: 1,
-      maxIdleTimeMS: 3000, // Very short
-      connectTimeoutMS: 1000, // Even more aggressive
-      heartbeatFrequencyMS: 2000, // Very frequent
-      retryWrites: true,
-      w: 'majority',
-      readPreference: 'primary',
-      // Additional serverless optimizations
+      maxIdleTimeMS: 1000, // Very short
+      connectTimeoutMS: 500, // Very aggressive
+      heartbeatFrequencyMS: 1000, // Very frequent
+      retryWrites: false, // Disable retry writes for speed
+      w: 1, // Simpler write concern
+      readPreference: 'primaryPreferred', // Faster reads
+      // Serverless optimizations
       family: 4, // Force IPv4
-      keepAlive: true,
-      keepAliveInitialDelay: 500,
+      keepAlive: false, // Disable keepAlive for serverless
       // Force immediate connection
       directConnection: true,
       // Disable DNS caching
       dnsServer: '8.8.8.8',
+      // Disable SSL validation for speed (if needed)
+      ssl: false,
+      // Minimal connection options
+      maxConnecting: 1,
     });
     
     await connectionPromise;
@@ -101,10 +131,10 @@ const connectDB = async () => {
     isConnected = false;
     connectionPromise = null;
     
-    // Retry logic with exponential backoff
+    // Retry logic with minimal delay
     if (retryCount < MAX_RETRIES - 1) {
       retryCount++;
-      const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000); // Exponential backoff, max 5s
+      const delay = 200; // Fixed short delay
       console.log(`🔄 Retrying connection in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return connectDB(); // Recursive retry
