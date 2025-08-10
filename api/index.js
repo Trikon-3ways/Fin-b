@@ -38,28 +38,44 @@ const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlK
 
 // MongoDB connection state
 let isConnected = false;
+let connectionPromise = null;
 
-// Connect to MongoDB function
+// Connect to MongoDB function with aggressive timeouts
 const connectDB = async () => {
   if (isConnected) {
     console.log('✅ MongoDB already connected');
     return;
   }
   
+  // If connection is in progress, wait for it
+  if (connectionPromise) {
+    console.log('⏳ MongoDB connection in progress, waiting...');
+    await connectionPromise;
+    return;
+  }
+  
   try {
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGOURI, {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      bufferCommands: true, // Changed to true for serverless
-      maxPoolSize: 10,
+    console.log('🚀 Connecting to MongoDB...');
+    connectionPromise = mongoose.connect(MONGOURI, {
+      serverSelectionTimeoutMS: 5000, // Reduced from 30000
+      socketTimeoutMS: 10000, // Reduced from 45000
+      bufferCommands: true,
+      maxPoolSize: 5, // Reduced for serverless
       minPoolSize: 1,
+      maxIdleTimeMS: 30000,
+      connectTimeoutMS: 10000,
+      heartbeatFrequencyMS: 10000,
     });
+    
+    await connectionPromise;
     isConnected = true;
+    connectionPromise = null;
     console.log('✅ MongoDB connected successfully!');
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
     isConnected = false;
+    connectionPromise = null;
+    throw error; // Re-throw to handle in route
   }
 };
 
