@@ -9,11 +9,7 @@ const app = express();
 
 // Configure CORS to allow requests from your frontend
 app.use(cors({
-  origin: [
-    'https://finance-tracker-frontend-nu-eight.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
+  origin: true, // Allow all origins temporarily for debugging
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept']
@@ -40,22 +36,39 @@ app.use((err, req, res, next) => {
 });
 
 // MongoDB connection string
-const MONGOURI = process.env.MONGOURI ;
+const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlKKJez@personalexpensetracker.kpm5gmx.mongodb.net/personalexpensetracker';
 
-// Connect to MongoDB immediately
-console.log('Connecting to MongoDB...');
-mongoose.connect(MONGOURI, {
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-  bufferCommands: false,
-  maxPoolSize: 10,
-  minPoolSize: 1,
-})
-.then(() => {
-  console.log('✅ MongoDB connected successfully!');
-})
-.catch((error) => {
-  console.error('❌ MongoDB connection failed:', error.message);
+// MongoDB connection state
+let isConnected = false;
+
+// Connect to MongoDB function
+const connectDB = async () => {
+  if (isConnected) {
+    console.log('✅ MongoDB already connected');
+    return;
+  }
+  
+  try {
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(MONGOURI, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      bufferCommands: true, // Changed to true for serverless
+      maxPoolSize: 10,
+      minPoolSize: 1,
+    });
+    isConnected = true;
+    console.log('✅ MongoDB connected successfully!');
+  } catch (error) {
+    console.error('❌ MongoDB connection failed:', error.message);
+    isConnected = false;
+  }
+};
+
+// Connect on first request
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
 });
 
 // Only start server for local development
