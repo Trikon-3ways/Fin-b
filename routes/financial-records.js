@@ -10,17 +10,26 @@ router.get('', async (req, res) => {
       return res.status(400).json({ message: 'userId is required' });
     }
     
-    // Check MongoDB connection status
+    // Check MongoDB connection status with retry
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
+      console.log(`⚠️ MongoDB not ready (attempt ${attempts + 1}/${maxAttempts}), waiting...`);
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
     if (mongoose.connection.readyState !== 1) {
-      console.log('⚠️ MongoDB not ready, attempting to connect...');
-      // This will trigger the connection middleware
+      console.log('❌ MongoDB connection failed after retries');
       return res.status(503).json({ 
-        message: 'Database connection not ready, please try again' 
+        message: 'Database connection not ready, please try again',
+        error: 'Connection timeout after retries'
       });
     }
     
-    console.log('Fetching records for userId:', userId);
-    const records = await FinancialRecordModel.find({ userId: userId }).maxTimeMS(5000);
+    console.log('✅ MongoDB ready, fetching records for userId:', userId);
+    const records = await FinancialRecordModel.find({ userId: userId }).maxTimeMS(3000);
     console.log('Found records:', records.length);
     res.status(200).json(records);
   } catch (error) {
@@ -43,18 +52,29 @@ router.get('', async (req, res) => {
 
 router.post('',  async (req, res) => {
     try {
-        // Check MongoDB connection status
+        // Check MongoDB connection status with retry
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
+            console.log(`⚠️ MongoDB not ready (attempt ${attempts + 1}/${maxAttempts}), waiting...`);
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
         if (mongoose.connection.readyState !== 1) {
-            console.log('⚠️ MongoDB not ready, attempting to connect...');
+            console.log('❌ MongoDB connection failed after retries');
             return res.status(503).json({ 
-                message: 'Database connection not ready, please try again' 
+                message: 'Database connection not ready, please try again',
+                error: 'Connection timeout after retries'
             });
         }
         
+        console.log('✅ MongoDB ready, creating record');
         console.log('Received data:', req.body);
         const newRecord = new FinancialRecordModel(req.body);
         console.log('Created model instance:', newRecord);
-        const savedRecord = await newRecord.save().maxTimeMS(5000);
+        const savedRecord = await newRecord.save().maxTimeMS(3000);
         console.log('Saved record:', savedRecord);
         res.status(201).json(savedRecord);
     } catch (error) {

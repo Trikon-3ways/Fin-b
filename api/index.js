@@ -40,10 +40,11 @@ const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlK
 let isConnected = false;
 let connectionPromise = null;
 let retryCount = 0;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 
-// Connect to MongoDB function with retry logic
+// Connect to MongoDB function with ultra-aggressive timeouts
 const connectDB = async () => {
+  // Check if already connected and healthy
   if (isConnected && mongoose.connection.readyState === 1) {
     console.log('✅ MongoDB already connected');
     return;
@@ -59,23 +60,29 @@ const connectDB = async () => {
   try {
     console.log(`🚀 Connecting to MongoDB (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
     
-    // Close existing connection if any
+    // Force disconnect any existing connection
     if (mongoose.connection.readyState !== 0) {
+      console.log('🔄 Force disconnecting existing connection...');
       await mongoose.disconnect();
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait for cleanup
     }
     
     connectionPromise = mongoose.connect(MONGOURI, {
-      serverSelectionTimeoutMS: 3000, // Very aggressive
-      socketTimeoutMS: 5000, // Very aggressive
-      bufferCommands: false, // Changed back to false
-      maxPoolSize: 1, // Minimal pool for serverless
+      serverSelectionTimeoutMS: 2000, // Ultra-aggressive
+      socketTimeoutMS: 3000, // Ultra-aggressive
+      bufferCommands: false, // Critical for serverless
+      maxPoolSize: 1, // Minimal pool
       minPoolSize: 1,
-      maxIdleTimeMS: 10000,
-      connectTimeoutMS: 5000, // Very aggressive
-      heartbeatFrequencyMS: 5000,
+      maxIdleTimeMS: 5000, // Very short
+      connectTimeoutMS: 3000, // Ultra-aggressive
+      heartbeatFrequencyMS: 3000, // Very frequent
       retryWrites: true,
       w: 'majority',
       readPreference: 'primary',
+      // Additional serverless optimizations
+      family: 4, // Force IPv4
+      keepAlive: true,
+      keepAliveInitialDelay: 1000,
     });
     
     await connectionPromise;
@@ -88,11 +95,12 @@ const connectDB = async () => {
     isConnected = false;
     connectionPromise = null;
     
-    // Retry logic
+    // Retry logic with exponential backoff
     if (retryCount < MAX_RETRIES - 1) {
       retryCount++;
-      console.log(`🔄 Retrying connection in 1 second...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000); // Exponential backoff, max 5s
+      console.log(`🔄 Retrying connection in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
       return connectDB(); // Recursive retry
     } else {
       retryCount = 0;
