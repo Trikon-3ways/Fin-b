@@ -59,6 +59,7 @@ const connectDB = async () => {
   
   try {
     console.log(`🚀 Connecting to MongoDB (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+    console.log('MongoDB URI:', MONGOURI.substring(0, 50) + '...');
     
     // Force disconnect any existing connection
     if (mongoose.connection.readyState !== 0) {
@@ -68,21 +69,25 @@ const connectDB = async () => {
     }
     
     connectionPromise = mongoose.connect(MONGOURI, {
-      serverSelectionTimeoutMS: 2000, // Ultra-aggressive
-      socketTimeoutMS: 3000, // Ultra-aggressive
+      serverSelectionTimeoutMS: 1000, // Even more aggressive
+      socketTimeoutMS: 2000, // Even more aggressive
       bufferCommands: false, // Critical for serverless
       maxPoolSize: 1, // Minimal pool
       minPoolSize: 1,
-      maxIdleTimeMS: 5000, // Very short
-      connectTimeoutMS: 3000, // Ultra-aggressive
-      heartbeatFrequencyMS: 3000, // Very frequent
+      maxIdleTimeMS: 3000, // Very short
+      connectTimeoutMS: 1000, // Even more aggressive
+      heartbeatFrequencyMS: 2000, // Very frequent
       retryWrites: true,
       w: 'majority',
       readPreference: 'primary',
       // Additional serverless optimizations
       family: 4, // Force IPv4
       keepAlive: true,
-      keepAliveInitialDelay: 1000,
+      keepAliveInitialDelay: 500,
+      // Force immediate connection
+      directConnection: true,
+      // Disable DNS caching
+      dnsServer: '8.8.8.8',
     });
     
     await connectionPromise;
@@ -92,6 +97,7 @@ const connectDB = async () => {
     console.log('✅ MongoDB connected successfully!');
   } catch (error) {
     console.error(`❌ MongoDB connection failed (attempt ${retryCount + 1}):`, error.message);
+    console.error('Full error:', error);
     isConnected = false;
     connectionPromise = null;
     

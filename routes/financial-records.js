@@ -4,6 +4,11 @@ import FinancialRecordModel from "../schema/financial-records.js";
 
 const router = express.Router();
 
+// Force redeploy - mongoose import fix
+
+// Test mongoose import
+console.log('Mongoose imported successfully:', typeof mongoose);
+
 router.get('', async (req, res) => {
   try {
     const userId = req.query.userId;
@@ -13,12 +18,12 @@ router.get('', async (req, res) => {
     
     // Check MongoDB connection status with retry
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 2; // Reduced attempts
     
     while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
       console.log(`⚠️ MongoDB not ready (attempt ${attempts + 1}/${maxAttempts}), waiting...`);
       attempts++;
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Reduced wait time
     }
     
     if (mongoose.connection.readyState !== 1) {
@@ -30,7 +35,7 @@ router.get('', async (req, res) => {
     }
     
     console.log('✅ MongoDB ready, fetching records for userId:', userId);
-    const records = await FinancialRecordModel.find({ userId: userId }).maxTimeMS(3000);
+    const records = await FinancialRecordModel.find({ userId: userId }).maxTimeMS(2000); // Reduced timeout
     console.log('Found records:', records.length);
     res.status(200).json(records);
   } catch (error) {
@@ -55,12 +60,12 @@ router.post('',  async (req, res) => {
     try {
         // Check MongoDB connection status with retry
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 2; // Reduced attempts
         
         while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
             console.log(`⚠️ MongoDB not ready (attempt ${attempts + 1}/${maxAttempts}), waiting...`);
             attempts++;
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500)); // Reduced wait time
         }
         
         if (mongoose.connection.readyState !== 1) {
@@ -75,7 +80,7 @@ router.post('',  async (req, res) => {
         console.log('Received data:', req.body);
         const newRecord = new FinancialRecordModel(req.body);
         console.log('Created model instance:', newRecord);
-        const savedRecord = await newRecord.save().maxTimeMS(3000);
+        const savedRecord = await newRecord.save().maxTimeMS(2000); // Reduced timeout
         console.log('Saved record:', savedRecord);
         res.status(201).json(savedRecord);
     } catch (error) {
