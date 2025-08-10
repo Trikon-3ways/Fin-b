@@ -39,10 +39,12 @@ const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlK
 // MongoDB connection state
 let isConnected = false;
 let connectionPromise = null;
+let retryCount = 0;
+const MAX_RETRIES = 3;
 
-// Connect to MongoDB function with aggressive timeouts
+// Connect to MongoDB function with retry logic
 const connectDB = async () => {
-  if (isConnected) {
+  if (isConnected && mongoose.connection.readyState === 1) {
     console.log('✅ MongoDB already connected');
     return;
   }
@@ -55,27 +57,47 @@ const connectDB = async () => {
   }
   
   try {
-    console.log('🚀 Connecting to MongoDB...');
+    console.log(`🚀 Connecting to MongoDB (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+    
+    // Close existing connection if any
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    
     connectionPromise = mongoose.connect(MONGOURI, {
-      serverSelectionTimeoutMS: 5000, // Reduced from 30000
-      socketTimeoutMS: 10000, // Reduced from 45000
-      bufferCommands: true,
-      maxPoolSize: 5, // Reduced for serverless
+      serverSelectionTimeoutMS: 3000, // Very aggressive
+      socketTimeoutMS: 5000, // Very aggressive
+      bufferCommands: false, // Changed back to false
+      maxPoolSize: 1, // Minimal pool for serverless
       minPoolSize: 1,
-      maxIdleTimeMS: 30000,
-      connectTimeoutMS: 10000,
-      heartbeatFrequencyMS: 10000,
+      maxIdleTimeMS: 10000,
+      connectTimeoutMS: 5000, // Very aggressive
+      heartbeatFrequencyMS: 5000,
+      retryWrites: true,
+      w: 'majority',
+      readPreference: 'primary',
     });
     
     await connectionPromise;
     isConnected = true;
     connectionPromise = null;
+    retryCount = 0;
     console.log('✅ MongoDB connected successfully!');
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
+    console.error(`❌ MongoDB connection failed (attempt ${retryCount + 1}):`, error.message);
     isConnected = false;
     connectionPromise = null;
-    throw error; // Re-throw to handle in route
+    
+    // Retry logic
+    if (retryCount < MAX_RETRIES - 1) {
+      retryCount++;
+      console.log(`🔄 Retrying connection in 1 second...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return connectDB(); // Recursive retry
+    } else {
+      retryCount = 0;
+      throw error; // Max retries reached
+    }
   }
 };
 

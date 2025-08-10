@@ -9,12 +9,31 @@ router.get('', async (req, res) => {
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' });
     }
+    
+    // Check MongoDB connection status
+    if (mongoose.connection.readyState !== 1) {
+      console.log('⚠️ MongoDB not ready, attempting to connect...');
+      // This will trigger the connection middleware
+      return res.status(503).json({ 
+        message: 'Database connection not ready, please try again' 
+      });
+    }
+    
     console.log('Fetching records for userId:', userId);
-    const records = await FinancialRecordModel.find({ userId: userId });
+    const records = await FinancialRecordModel.find({ userId: userId }).maxTimeMS(5000);
     console.log('Found records:', records.length);
     res.status(200).json(records);
   } catch (error) {
     console.error('Error in GET /financial-records:', error);
+    
+    // Handle specific MongoDB errors
+    if (error.name === 'MongoNetworkError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({ 
+        message: 'Database connection issue, please try again',
+        error: 'Connection timeout'
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Error fetching financial records', 
       error: error.message || 'Unknown error' 
@@ -24,14 +43,31 @@ router.get('', async (req, res) => {
 
 router.post('',  async (req, res) => {
     try {
+        // Check MongoDB connection status
+        if (mongoose.connection.readyState !== 1) {
+            console.log('⚠️ MongoDB not ready, attempting to connect...');
+            return res.status(503).json({ 
+                message: 'Database connection not ready, please try again' 
+            });
+        }
+        
         console.log('Received data:', req.body);
         const newRecord = new FinancialRecordModel(req.body);
         console.log('Created model instance:', newRecord);
-        const savedRecord = await newRecord.save();
+        const savedRecord = await newRecord.save().maxTimeMS(5000);
         console.log('Saved record:', savedRecord);
         res.status(201).json(savedRecord);
     } catch (error) {
         console.error('Error creating financial record:', error);
+        
+        // Handle specific MongoDB errors
+        if (error.name === 'MongoNetworkError' || error.message.includes('buffering timed out')) {
+            return res.status(503).json({ 
+                message: 'Database connection issue, please try again',
+                error: 'Connection timeout'
+            });
+        }
+        
         res.status(500).json({ message: 'Error creating financial record', error: error.message });
     }
     });
