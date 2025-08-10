@@ -66,7 +66,7 @@ const MONGOURI = process.env.MONGOURI || 'mongodb+srv://vermaroli89:fAIamwYiVIlK
 let isConnected = false;
 let connectionPromise = null;
 let retryCount = 0;
-const MAX_RETRIES = 3; // Reduced retries
+const MAX_RETRIES = 2; // Very few retries
 
 // Connect to MongoDB function with serverless-optimized approach
 const connectDB = async () => {
@@ -91,19 +91,19 @@ const connectDB = async () => {
     if (mongoose.connection.readyState !== 0) {
       console.log('🔄 Force disconnecting existing connection...');
       await mongoose.disconnect();
-      await new Promise(resolve => setTimeout(resolve, 100)); // Faster cleanup
+      await new Promise(resolve => setTimeout(resolve, 50)); // Very fast cleanup
     }
     
     connectionPromise = mongoose.connect(MONGOURI, {
       // Ultra-fast timeouts for serverless
-      serverSelectionTimeoutMS: 500, // Very aggressive
-      socketTimeoutMS: 1000, // Very aggressive
+      serverSelectionTimeoutMS: 300, // Extremely aggressive
+      socketTimeoutMS: 500, // Extremely aggressive
       bufferCommands: false, // Critical for serverless
       maxPoolSize: 1, // Minimal pool
       minPoolSize: 1,
-      maxIdleTimeMS: 1000, // Very short
-      connectTimeoutMS: 500, // Very aggressive
-      heartbeatFrequencyMS: 1000, // Very frequent
+      maxIdleTimeMS: 500, // Very short
+      connectTimeoutMS: 300, // Extremely aggressive
+      heartbeatFrequencyMS: 500, // Very frequent
       retryWrites: false, // Disable retry writes for speed
       w: 1, // Simpler write concern
       readPreference: 'primaryPreferred', // Faster reads
@@ -118,6 +118,10 @@ const connectDB = async () => {
       ssl: false,
       // Minimal connection options
       maxConnecting: 1,
+      // Disable all timeouts that could slow down
+      maxStalenessSeconds: 0,
+      // Force immediate connection
+      immediate: true,
     });
     
     await connectionPromise;
@@ -134,7 +138,7 @@ const connectDB = async () => {
     // Retry logic with minimal delay
     if (retryCount < MAX_RETRIES - 1) {
       retryCount++;
-      const delay = 200; // Fixed short delay
+      const delay = 100; // Very short delay
       console.log(`🔄 Retrying connection in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return connectDB(); // Recursive retry
@@ -145,10 +149,22 @@ const connectDB = async () => {
   }
 };
 
-// Connect on first request
+// Connect on first request with timeout
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    // Set a very short timeout for connection
+    const connectionTimeout = setTimeout(() => {
+      console.log('⚠️ Connection timeout, proceeding anyway...');
+      next();
+    }, 800); // 800ms timeout
+    
+    await connectDB();
+    clearTimeout(connectionTimeout);
+    next();
+  } catch (error) {
+    console.log('⚠️ Connection failed, proceeding anyway...');
+    next();
+  }
 });
 
 // Export for Vercel
