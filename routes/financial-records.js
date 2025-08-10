@@ -9,10 +9,16 @@ router.get('', async (req, res) => {
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' });
     }
+    console.log('Fetching records for userId:', userId);
     const records = await FinancialRecordModel.find({ userId: userId });
+    console.log('Found records:', records.length);
     res.status(200).json(records);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching financial records', error });
+    console.error('Error in GET /financial-records:', error);
+    res.status(500).json({ 
+      message: 'Error fetching financial records', 
+      error: error.message || 'Unknown error' 
+    });
   }
 });
 
@@ -20,8 +26,10 @@ router.post('',  async (req, res) => {
     try {
         console.log('Received data:', req.body);
         const newRecord = new FinancialRecordModel(req.body);
-        await newRecord.save();
-        res.status(201).json(newRecord);
+        console.log('Created model instance:', newRecord);
+        const savedRecord = await newRecord.save();
+        console.log('Saved record:', savedRecord);
+        res.status(201).json(savedRecord);
     } catch (error) {
         console.error('Error creating financial record:', error);
         res.status(500).json({ message: 'Error creating financial record', error: error.message });
@@ -36,7 +44,11 @@ router.put('/:id', async (req, res) => {
         }
         res.status(200).json(updatedRecord);
     } catch (error) {
-        res.status(500).json({ message: 'Error updating financial record', error });
+        console.error('Error in PUT /financial-records:', error);
+        res.status(500).json({ 
+            message: 'Error updating financial record', 
+            error: error.message || 'Unknown error' 
+        });
     }
 }); 
 router.delete('/:id', async (req, res) => {
@@ -48,7 +60,11 @@ router.delete('/:id', async (req, res) => {
         }
         res.status(200).json({ message: 'Financial record deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting financial record', error });
+        console.error('Error in DELETE /financial-records:', error);
+        res.status(500).json({ 
+            message: 'Error deleting financial record', 
+            error: error.message || 'Unknown error' 
+        });
     }
 });
 
