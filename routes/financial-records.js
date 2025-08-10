@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import FinancialRecordModel from "../schema/financial-records.js";
 
 const router = express.Router();
